@@ -20,10 +20,12 @@ def download_model():
     model_path = os.path.join(tempfile.gettempdir(), "deepfake_cnn_model.h5")
 
     if not os.path.exists(model_path):
+        st.write("正在下載模型...")
         response = requests.get(MODEL_URL)
         if response.status_code == 200:
             with open(model_path, "wb") as f:
                 f.write(response.content)
+                st.write("模型下載成功！")
         else:
             st.error("❌ 模型下載失敗，請確認 Hugging Face 模型網址是否正確。")
             raise Exception("模型下載失敗。")
@@ -40,7 +42,8 @@ def download_model():
 # 🔹 載入模型
 try:
     custom_model = download_model()
-except Exception:
+except Exception as e:
+    st.write(f"模型載入錯誤: {e}")
     st.stop()
 
 # 🔹 ResNet50 模型建立
@@ -74,53 +77,62 @@ def process_video_and_generate_result(video_file):
         temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
         with open(temp_video_path, "wb") as f:
             f.write(video_file.read())
-        st.write(f"影片已保存於臨時路徑：{temp_video_path}")  # 顯示檔案儲存位置，便於檢查
+        st.write(f"影片成功保存至臨時路徑: {temp_video_path}")
+    except Exception as e:
+        st.error(f"影片保存錯誤: {e}")
+        return None
 
-        # 使用 OpenCV 來讀取影片
-        cap = cv2.VideoCapture(temp_video_path)
+    # 使用 OpenCV 來讀取影片
+    cap = cv2.VideoCapture(temp_video_path)
 
-        # 取得影片的幀率與大小
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    if not cap.isOpened():
+        st.error("❌ 無法打開影片檔案，請確認檔案格式是否正確。")
+        return None
 
-        # 設定輸出的影片路徑
-        output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 設定影片編碼
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    # 取得影片的幀率與大小
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    st.write(f"影片幀率: {fps}, 影片大小: {width}x{height}")
 
-        frame_count = 0
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break  # 影片讀取結束
+    # 設定輸出的影片路徑
+    output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 設定影片編碼
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
-            # 進行圖片預處理
-            resnet_input, custom_input, display_img = preprocess_for_models(frame)
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break  # 影片讀取結束
 
-            # 預測
+        # 進行圖片預處理
+        resnet_input, custom_input, display_img = preprocess_for_models(frame)
+
+        # 預測
+        try:
             resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
             custom_pred = custom_model.predict(custom_input)[0][0]
+        except Exception as e:
+            st.error(f"預測錯誤: {e}")
+            break
 
-            # 合併結果
-            combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
-            label = "Deepfake" if combined_pred > 0.5 else "Real"
-            confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+        # 合併結果
+        combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
+        label = "Deepfake" if combined_pred > 0.5 else "Real"
+        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
-            # 在影像上繪製標籤與信心分數
-            cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # 在影像上繪製標籤與信心分數
+        cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-            # 寫入每一幀
-            out.write(frame)
-            frame_count += 1
+        # 寫入每一幀
+        out.write(frame)
+        frame_count += 1
 
-        cap.release()
-        out.release()
+    cap.release()
+    out.release()
 
-        return output_video_path
-    except Exception as e:
-        st.error(f"處理影片時出錯: {str(e)}")
-        return None
+    return output_video_path
 
 # 🔹 Streamlit App
 st.title("🕵️ Deepfake 偵測 App")
@@ -149,9 +161,11 @@ if uploaded_file is not None:
 
     elif uploaded_file.type in ["video/mp4", "video/quicktime"]:
         # 處理影片並生成結果
-        st.markdown("### 📽️ 正在逐幀處理影片...")
+        st.markdown("### 📽️ 正在處理影片...")
         processed_video_path = process_video_and_generate_result(uploaded_file)
 
         if processed_video_path:
             # 顯示處理後的影片
             st.video(processed_video_path)
+        else:
+            st.error("❌ 處理影片時發生錯誤。")
