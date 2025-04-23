@@ -70,52 +70,57 @@ def preprocess_for_models(img):
 # 🔹 偵測影片並生成新影片
 def process_video_and_generate_result(video_file):
     # 將上傳的影片保存為臨時文件
-    temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
-    with open(temp_video_path, "wb") as f:
-        f.write(video_file.read())
+    try:
+        temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
+        with open(temp_video_path, "wb") as f:
+            f.write(video_file.read())
+        st.write(f"影片已保存於臨時路徑：{temp_video_path}")  # 顯示檔案儲存位置，便於檢查
 
-    # 使用 OpenCV 來讀取影片
-    cap = cv2.VideoCapture(temp_video_path)
+        # 使用 OpenCV 來讀取影片
+        cap = cv2.VideoCapture(temp_video_path)
 
-    # 取得影片的幀率與大小
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # 取得影片的幀率與大小
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # 設定輸出的影片路徑
-    output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 設定影片編碼
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        # 設定輸出的影片路徑
+        output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 設定影片編碼
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
-    frame_count = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break  # 影片讀取結束
+        frame_count = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break  # 影片讀取結束
 
-        # 進行圖片預處理
-        resnet_input, custom_input, display_img = preprocess_for_models(frame)
+            # 進行圖片預處理
+            resnet_input, custom_input, display_img = preprocess_for_models(frame)
 
-        # 預測
-        resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-        custom_pred = custom_model.predict(custom_input)[0][0]
+            # 預測
+            resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+            custom_pred = custom_model.predict(custom_input)[0][0]
 
-        # 合併結果
-        combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
-        label = "Deepfake" if combined_pred > 0.5 else "Real"
-        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+            # 合併結果
+            combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
+            label = "Deepfake" if combined_pred > 0.5 else "Real"
+            confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
-        # 在影像上繪製標籤與信心分數
-        cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            # 在影像上繪製標籤與信心分數
+            cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-        # 寫入每一幀
-        out.write(frame)
-        frame_count += 1
+            # 寫入每一幀
+            out.write(frame)
+            frame_count += 1
 
-    cap.release()
-    out.release()
+        cap.release()
+        out.release()
 
-    return output_video_path
+        return output_video_path
+    except Exception as e:
+        st.error(f"處理影片時出錯: {str(e)}")
+        return None
 
 # 🔹 Streamlit App
 st.title("🕵️ Deepfake 偵測 App")
@@ -147,5 +152,6 @@ if uploaded_file is not None:
         st.markdown("### 📽️ 正在逐幀處理影片...")
         processed_video_path = process_video_and_generate_result(uploaded_file)
 
-        # 顯示處理後的影片
-        st.video(processed_video_path)
+        if processed_video_path:
+            # 顯示處理後的影片
+            st.video(processed_video_path)
