@@ -67,8 +67,8 @@ def preprocess_for_models(img):
 
     return resnet_input, custom_input, img_resized
 
-# 🔹 偵測影片
-def process_video(video_file):
+# 🔹 偵測影片並生成新影片
+def process_video_and_generate_result(video_file):
     # 將上傳的影片保存為臨時文件
     temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
     with open(temp_video_path, "wb") as f:
@@ -76,6 +76,16 @@ def process_video(video_file):
 
     # 使用 OpenCV 來讀取影片
     cap = cv2.VideoCapture(temp_video_path)
+
+    # 取得影片的幀率與大小
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # 設定輸出的影片路徑
+    output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 設定影片編碼
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
     frame_count = 0
     while cap.isOpened():
@@ -95,13 +105,17 @@ def process_video(video_file):
         label = "Deepfake" if combined_pred > 0.5 else "Real"
         confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
-        # 顯示每幀結果
+        # 在影像上繪製標籤與信心分數
         cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-        st.image(frame, channels="BGR", caption=f"影片幀 {frame_count}", use_container_width=True)
 
+        # 寫入每一幀
+        out.write(frame)
         frame_count += 1
 
     cap.release()
+    out.release()
+
+    return output_video_path
 
 # 🔹 Streamlit App
 st.title("🕵️ Deepfake 偵測 App")
@@ -129,6 +143,9 @@ if uploaded_file is not None:
         st.markdown(f"### 🧑‍⚖️ 最終預測結果: **{label}** ({confidence:.2%})")
 
     elif uploaded_file.type in ["video/mp4", "video/quicktime"]:
-        # 處理影片
+        # 處理影片並生成結果
         st.markdown("### 📽️ 正在處理影片...")
-        process_video(uploaded_file)
+        processed_video_path = process_video_and_generate_result(uploaded_file)
+
+        # 顯示處理後的影片
+        st.video(processed_video_path)
