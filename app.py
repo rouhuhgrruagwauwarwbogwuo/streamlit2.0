@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model, Sequential
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
-from tensorflow.keras.layers imporat Dense
+from tensorflow.keras.layers import Dense
 from fpdf import FPDF
 from PIL import Image
 
