@@ -97,13 +97,16 @@ def process_video_and_generate_result(uploaded_file):
         custom_pred = custom_model.predict(custom_input)[0][0]
 
         # 合併結果
-        combined_pred = (resnet_pred + custom_pred) / 2
-        label = "Deepfake" if combined_pred > 0.5 else "Real"
-        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+        resnet_label = "Deepfake" if resnet_pred > 0.5 else "Real"
+        custom_label = "Deepfake" if custom_pred > 0.5 else "Real"
+        resnet_confidence = resnet_pred if resnet_pred > 0.5 else 1 - resnet_pred
+        custom_confidence = custom_pred if custom_pred > 0.5 else 1 - custom_pred
 
-        # 繪製標籤到影像
-        color = (0, 0, 255) if combined_pred > 0.5 else (0, 255, 0)
-        cv2.putText(frame, f"{label} ({confidence:.2%})", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        # 標註顯示
+        color_resnet = (0, 0, 255) if resnet_pred > 0.5 else (0, 255, 0)
+        color_custom = (0, 0, 255) if custom_pred > 0.5 else (0, 255, 0)
+        cv2.putText(frame, f"ResNet: {resnet_label} ({resnet_confidence:.2%})", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color_resnet, 2)
+        cv2.putText(frame, f"CNN: {custom_label} ({custom_confidence:.2%})", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, color_custom, 2)
 
         # 寫入影像
         out.write(frame)
@@ -116,33 +119,34 @@ def process_video_and_generate_result(uploaded_file):
 # 🔹 Streamlit App
 st.title("🕵️ Deepfake 偵測 App")
 
-uploaded_file = st.file_uploader("📤 上傳一張圖片或影片", type=["jpg", "jpeg", "png", "mp4", "mov"])
-if uploaded_file is not None:
-    # 若上傳的是圖片
-    if uploaded_file.type in ["image/jpeg", "image/png", "image/jpg"]:
-        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, 1)  # 解碼為圖片
+# 偵測圖片部分
+uploaded_file_img = st.file_uploader("📤 上傳一張圖片", type=["jpg", "jpeg", "png"])
+if uploaded_file_img is not None:
+    file_bytes = np.asarray(bytearray(uploaded_file_img.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, 1)  # 解碼為圖片
 
-        # 進行預處理並獲得模型輸入
-        resnet_input, custom_input, display_img = preprocess_for_models(img)
+    # 進行預處理並獲得模型輸入
+    resnet_input, custom_input, display_img = preprocess_for_models(img)
 
-        # 預測
-        resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-        custom_pred = custom_model.predict(custom_input)[0][0]
+    # 預測
+    resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+    custom_pred = custom_model.predict(custom_input)[0][0]
 
-        # 合併結果
-        combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
-        label = "Deepfake" if combined_pred > 0.5 else "Real"
-        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+    # 顯示 ResNet 和自訂 CNN 的結果
+    resnet_label = "Deepfake" if resnet_pred > 0.5 else "Real"
+    custom_label = "Deepfake" if custom_pred > 0.5 else "Real"
+    resnet_confidence = resnet_pred if resnet_pred > 0.5 else 1 - resnet_pred
+    custom_confidence = custom_pred if custom_pred > 0.5 else 1 - custom_pred
 
-        # 顯示圖片與結果
-        st.image(display_img, caption="你上傳的圖片", use_container_width=True)
-        st.markdown(f"### 🧑‍⚖️ 最終預測結果: **{label}** ({confidence:.2%})")
+    st.image(display_img, caption="你上傳的圖片", use_container_width=True)
+    st.markdown(f"### 🧑‍⚖️ ResNet 預測結果: **{resnet_label}** ({resnet_confidence:.2%})")
+    st.markdown(f"### 🧑‍⚖️ 自訂 CNN 預測結果: **{custom_label}** ({custom_confidence:.2%})")
 
-    # 若上傳的是影片
-    elif uploaded_file.type in ["video/mp4", "video/quicktime"]:
-        st.markdown("### 📽️ 正在處理影片...")
-        processed_video_path = process_video_and_generate_result(uploaded_file)
+# 偵測影片部分
+uploaded_file_vid = st.file_uploader("📤 上傳一個影片", type=["mp4", "mov", "avi"])
+if uploaded_file_vid is not None:
+    st.markdown("### 📽️ 正在處理影片...")
+    processed_video_path = process_video_and_generate_result(uploaded_file_vid)
 
-        # 顯示處理後的影片
-        st.video(processed_video_path)
+    # 顯示處理後的影片
+    st.video(processed_video_path)
