@@ -103,8 +103,12 @@ def process_video_and_predict_frame_by_frame(video_file):
         # 在影像上繪製標籤與信心分數
         cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-        # 顯示逐幀結果
-        st.image(frame, channels="BGR", caption=f"Frame {frame_count}", use_container_width=True)
+        # 顯示逐幀結果，使用try-except捕捉可能的錯誤
+        try:
+            st.image(frame, channels="BGR", caption=f"Frame {frame_count}", use_container_width=True)
+        except Exception as e:
+            st.error(f"Error displaying frame {frame_count}: {str(e)}")
+            break
 
         frame_count += 1
 
@@ -138,4 +142,7 @@ if uploaded_file is not None:
     elif uploaded_file.type in ["video/mp4", "video/quicktime"]:
         # 逐幀處理影片並顯示預測結果
         st.markdown("### 📽️ 正在逐幀處理影片...此過程可能需要一些時間。")
-        process_video_and_predict_frame_by_frame(uploaded_file)
+        try:
+            process_video_and_predict_frame_by_frame(uploaded_file)
+        except Exception as e:
+            st.error(f"影片處理過程中發生錯誤：{str(e)}")
