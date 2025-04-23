@@ -74,8 +74,13 @@ def preprocess_for_models(img):
 
 # 🔹 偵測影片
 def process_video(video_file):
+    # 將上傳的影片保存為臨時文件
+    temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
+    with open(temp_video_path, "wb") as f:
+        f.write(video_file.read())
+
     # 使用 OpenCV 來讀取影片
-    cap = cv2.VideoCapture(video_file)
+    cap = cv2.VideoCapture(temp_video_path)
 
     frame_count = 0
     while cap.isOpened():
