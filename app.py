@@ -11,7 +11,6 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense
-from fpdf import FPDF
 
 # 🔹 Hugging Face 模型下載網址
 MODEL_URL = "https://huggingface.co/wuwuwu123123/deepfake/resolve/main/deepfake_cnn_model.h5"
@@ -69,24 +68,6 @@ def preprocess_for_models(img):
 
     return resnet_input, custom_input, img_rgb
 
-# 🔹 生成 PDF 報告
-def generate_pdf(img, resnet_label, resnet_conf, custom_label, custom_conf):
-    pdf = FPDF()
-    pdf.add_page()
-
-    # 設定字型為 Arial，防止 Unicode 問題
-    pdf.set_font("Arial", size=12)
-
-    # 文字內容，確保是基本的英文字符，不使用特殊符號
-    pdf.cell(200, 10, txt=f"ResNet50 Prediction: {resnet_label} ({resnet_conf:.2%})", ln=True, align="C")
-    pdf.cell(200, 10, txt=f"Custom CNN Prediction: {custom_label} ({custom_conf:.2%})", ln=True, align="C")
-
-    # 儲存 PDF
-    output_path = "/tmp/deepfake_report.pdf"
-    pdf.output(output_path)
-    
-    return output_path
-
 # 🔹 Streamlit App
 st.title("🕵️ Deepfake 偵測 App")
 
@@ -101,17 +82,11 @@ if uploaded_file is not None:
     resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
     custom_pred = custom_model.predict(custom_input)[0][0]
 
-    resnet_label = "Deepfake" if resnet_pred > 0.5 else "Real"
-    custom_label = "Deepfake" if custom_pred > 0.5 else "Real"
-    resnet_conf = resnet_pred if resnet_pred > 0.5 else 1 - resnet_pred
-    custom_conf = custom_pred if custom_pred > 0.5 else 1 - custom_pred
+    # 合併結果：你可以根據需求加權這兩個預測結果
+    combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
+    label = "Deepfake" if combined_pred > 0.5 else "Real"
+    confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
     # 顯示圖片與結果
     st.image(display_img, caption="你上傳的圖片", use_container_width=True)
-    st.markdown(f"### 🤖 ResNet50 預測: **{resnet_label}** ({resnet_conf:.2%})")
-    st.markdown(f"### 🧠 自訂 CNN 預測: **{custom_label}** ({custom_conf:.2%})")
-
-    # 生成並下載 PDF 報告
-    pdf_path = generate_pdf(display_img, resnet_label, resnet_conf, custom_label, custom_conf)
-    with open(pdf_path, "rb") as f:
-        st.download_button("📥 下載報告 PDF", f, file_name="deepfake_report.pdf", mime="application/pdf")
+    st.markdown(f"### 🧑‍⚖️ 最終預測結果: **{label}** ({confidence:.2%})")
