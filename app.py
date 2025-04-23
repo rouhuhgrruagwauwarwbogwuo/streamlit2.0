@@ -6,7 +6,6 @@ import requests
 import h5py
 import streamlit as st
 import matplotlib.pyplot as plt
-from PIL import Image
 from tensorflow.keras.models import load_model, Sequential
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications import ResNet50
@@ -54,23 +53,19 @@ resnet_classifier.compile(optimizer='adam', loss='binary_crossentropy', metrics=
 
 # 🔹 預處理函數 for both models
 def preprocess_for_models(img):
-    # 使用 Pillow 來處理圖片，確保讀取正確
-    img_pil = Image.open(img)
-    img_rgb = np.array(img_pil.convert('RGB'))  # 轉換為 RGB 格式
-
-    img_resized = cv2.resize(img_rgb, (256, 256))  # 重新調整大小為 256x256
+    img_resized = cv2.resize(img, (256, 256))  # 重新調整大小為 256x256
 
     # For ResNet50
     resnet_input = preprocess_input(np.expand_dims(img_resized, axis=0))
 
     # For Custom CNN (CLAHE gray enhancement)
-    gray = cv2.cvtColor(img_resized, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     clahe_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
     custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)
 
-    return resnet_input, custom_input, img_rgb
+    return resnet_input, custom_input, img_resized
 
 # 🔹 偵測影片
 def process_video(video_file):
@@ -119,7 +114,7 @@ if uploaded_file is not None:
         st.image(file_bytes, caption="你上傳的圖片", use_container_width=True)
 
         # 進行預處理並獲得模型輸入
-        resnet_input, custom_input, display_img = preprocess_for_models(uploaded_file)
+        resnet_input, custom_input, display_img = preprocess_for_models(file_bytes)
 
         # 預測
         resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
