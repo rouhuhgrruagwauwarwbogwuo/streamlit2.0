@@ -142,6 +142,7 @@ def process_video_and_generate_result(video_file):
         out.release()
         smoothed = smooth_predictions(frame_preds)
         st.line_chart(smoothed)
+        st.success("🎉 偵測完成！")  # 偵測完成顯示成功訊息
         return output_video_path
     except Exception as e:
         st.error(f"❌ 影片處理錯誤: {e}")
