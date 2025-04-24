@@ -1,9 +1,7 @@
-streamlit
-tensorflow
-opencv-python-headless
-mtcnn
-h5py
+numpy
+opencv-python
 requests
-Pillow
+h5py
+streamlit
 matplotlib
-scikit-image
+tensorflow
