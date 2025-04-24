@@ -117,13 +117,17 @@ def process_video_and_generate_result(video_file):
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        st.write(f"影片總幀數: {total_frames}")
         output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        
         frame_preds = []
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
+                st.error("❌ 影片幀讀取失敗。")
                 break
             try:
                 resnet_input, custom_input, _ = preprocess_for_models(frame)
@@ -138,11 +142,18 @@ def process_video_and_generate_result(video_file):
             except Exception as e:
                 st.error(f"處理幀錯誤: {e}")
                 break
+
         cap.release()
         out.release()
+
+        if not os.path.exists(output_video_path):
+            st.error("❌ 無法生成影片檔案。")
+            return None
+        
         smoothed = smooth_predictions(frame_preds)
         st.line_chart(smoothed)
-        st.success("🎉 偵測完成！")  # 偵測完成顯示成功訊息
+
+        st.success("🎉 偵測完成！")
         return output_video_path
     except Exception as e:
         st.error(f"❌ 影片處理錯誤: {e}")
