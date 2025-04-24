@@ -59,30 +59,15 @@ def enhance_image(img):
     return img_sharp
 
 def preprocess_for_models(img):
-    # 增強圖片
     img = enhance_image(img)
-    
-    # 調整大小
     img_resized = cv2.resize(img, (256, 256))
-
-    # 確保圖片是 3D 陣列（H, W, C），並通過 expand_dims 增加批次維度
-    if img_resized.ndim == 2:  # 如果是灰階圖像 (H, W)
-        img_resized = np.expand_dims(img_resized, axis=-1)  # 將其轉換為 (H, W, 1)
-    img_resized = np.expand_dims(img_resized, axis=0)  # 增加批次維度，變成 (1, H, W, C)
-    
-    # 預處理 ResNet50 輸入
-    resnet_input = preprocess_input(img_resized)
-
-    # CLAHE 增強（灰階處理）
-    gray = cv2.cvtColor(img_resized[0], cv2.COLOR_BGR2GRAY)  # 取出第一張圖片進行處理
+    resnet_input = preprocess_input(np.expand_dims(img_resized, axis=0))
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     clahe_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
-    
-    # 自訂 CNN 輸入
-    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)  # 將自訂 CNN 輸入處理為 (1, 256, 256, 3)
-    
-    return resnet_input, custom_input, img_resized[0]  # 返回第一張圖片，避免傳遞多餘的維度
+    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)
+    return resnet_input, custom_input, img_resized
 
 # 🔁 後處理平滑：移動平均分數
 
@@ -157,6 +142,11 @@ st.title("🕵️ Deepfake 偵測 App")
 option = st.radio("請選擇檔案類型：", ("圖片", "影片"))
 
 uploaded_file = st.file_uploader("📤 上傳檔案", type=["jpg", "jpeg", "png", "mp4", "mov"])
+
+# 增加關閉按鈕
+if st.button('關閉應用程式'):
+    st.write("關閉應用程式...")
+    st.stop()  # 這會終止程式執行
 
 if uploaded_file is not None:
     try:
