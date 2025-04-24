@@ -147,7 +147,7 @@ uploaded_file = st.file_uploader("📤 上傳檔案", type=["jpg", "jpeg", "png"
 uploaded_file_placeholder = st.empty()
 
 # 增加關閉按鈕
-if st.button('關閉畫面並回到上傳'):
+if st.button('關閉結果並重新上傳'):
     uploaded_file_placeholder.empty()  # 清空當前畫面
     st.experimental_rerun()  # 重新載入應用程式，回到上傳畫面
 
