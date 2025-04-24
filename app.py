@@ -7,6 +7,7 @@ import h5py
 import streamlit as st
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model, Sequential
+from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense
@@ -48,6 +49,7 @@ resnet_classifier = Sequential([
 resnet_classifier.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
 # 🔧 改進預處理：CLAHE + 對比 + 銳化
+
 def enhance_image(img):
     img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
     img_yuv[:, :, 0] = cv2.equalizeHist(img_yuv[:, :, 0])
@@ -57,23 +59,40 @@ def enhance_image(img):
     return img_sharp
 
 def preprocess_for_models(img):
+    # 增強圖片
     img = enhance_image(img)
+    
+    # 調整大小
     img_resized = cv2.resize(img, (256, 256))
-    resnet_input = preprocess_input(np.expand_dims(img_resized, axis=0))
-    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+
+    # 確保圖片是 3D 陣列（H, W, C），並通過 expand_dims 增加批次維度
+    if img_resized.ndim == 2:  # 如果是灰階圖像 (H, W)
+        img_resized = np.expand_dims(img_resized, axis=-1)  # 將其轉換為 (H, W, 1)
+    img_resized = np.expand_dims(img_resized, axis=0)  # 增加批次維度，變成 (1, H, W, C)
+    
+    # 預處理 ResNet50 輸入
+    resnet_input = preprocess_input(img_resized)
+
+    # CLAHE 增強（灰階處理）
+    gray = cv2.cvtColor(img_resized[0], cv2.COLOR_BGR2GRAY)  # 取出第一張圖片進行處理
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     clahe_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
-    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)
-    return resnet_input, custom_input, img_resized
+    
+    # 自訂 CNN 輸入
+    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)  # 將自訂 CNN 輸入處理為 (1, 256, 256, 3)
+    
+    return resnet_input, custom_input, img_resized[0]  # 返回第一張圖片，避免傳遞多餘的維度
 
 # 🔁 後處理平滑：移動平均分數
+
 def smooth_predictions(pred_list, window_size=5):
     if len(pred_list) < window_size:
         return pred_list
     return np.convolve(pred_list, np.ones(window_size)/window_size, mode='valid')
 
 # 📊 信心視覺化
+
 def plot_confidence(resnet_conf, custom_conf, combined_conf):
     fig, ax = plt.subplots()
     models = ['ResNet50', 'Custom CNN', 'Combined']
@@ -84,6 +103,7 @@ def plot_confidence(resnet_conf, custom_conf, combined_conf):
     st.pyplot(fig)
 
 # 🔹 圖片處理邏輯
+
 def process_image(file_bytes):
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     resnet_input, custom_input, display_img = preprocess_for_models(img)
@@ -96,6 +116,7 @@ def process_image(file_bytes):
     plot_confidence(resnet_pred, custom_pred, combined_pred)
 
 # 🔹 影片處理邏輯
+
 def process_video_and_generate_result(video_file):
     temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
     with open(temp_video_path, "wb") as f:
