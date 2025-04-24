@@ -143,10 +143,13 @@ option = st.radio("請選擇檔案類型：", ("圖片", "影片"))
 
 uploaded_file = st.file_uploader("📤 上傳檔案", type=["jpg", "jpeg", "png", "mp4", "mov"])
 
+# 創建區域來顯示上傳區域
+uploaded_file_placeholder = st.empty()
+
 # 增加關閉按鈕
-if st.button('關閉應用程式'):
-    st.write("關閉應用程式...")
-    st.stop()  # 這會終止程式執行
+if st.button('關閉畫面並回到上傳'):
+    uploaded_file_placeholder.empty()  # 清空當前畫面
+    st.experimental_rerun()  # 重新載入應用程式，回到上傳畫面
 
 if uploaded_file is not None:
     try:
