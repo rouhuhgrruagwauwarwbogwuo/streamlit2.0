@@ -110,7 +110,7 @@ def process_image(file_bytes):
     except Exception as e:
         st.error(f"❌ 圖片處理錯誤: {e}")
 
-# 🔹 影片處理邏輯
+# 🔹 影片處理邏輯：每 10 幀處理一次並顯示圖片
 
 def process_video_and_generate_result(video_file):
     try:
@@ -126,42 +126,41 @@ def process_video_and_generate_result(video_file):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         st.write(f"影片總幀數: {total_frames}")
-        output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
         
         frame_preds = []
+        frame_count = 0
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 st.error("❌ 影片幀讀取失敗。")
                 break
-            try:
-                resnet_input, custom_input, _ = preprocess_for_models(frame)
-                resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-                custom_pred = custom_model.predict(custom_input)[0][0]
-                combined_pred = (resnet_pred + custom_pred) / 2
-                frame_preds.append(combined_pred)
-                label = "Deepfake" if combined_pred > 0.5 else "Real"
-                confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
-                cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                out.write(frame)
-            except Exception as e:
-                st.error(f"處理幀錯誤: {e}")
-                break
+
+            frame_count += 1
+            if frame_count % 10 == 0:  # 每 10 幀處理一次
+                try:
+                    resnet_input, custom_input, display_img = preprocess_for_models(frame)
+                    resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+                    custom_pred = custom_model.predict(custom_input)[0][0]
+                    combined_pred = (resnet_pred + custom_pred) / 2
+                    label = "Deepfake" if combined_pred > 0.5 else "Real"
+                    confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+
+                    # 顯示圖片
+                    st.image(display_img, caption=f"幀 {frame_count}: {label} ({confidence:.2%})", use_container_width=True)
+
+                    frame_preds.append(combined_pred)
+
+                except Exception as e:
+                    st.error(f"處理幀錯誤: {e}")
+                    break
 
         cap.release()
-        out.release()
 
-        if not os.path.exists(output_video_path):
-            st.error("❌ 無法生成影片檔案。")
-            return None
-        
+        # 顯示平滑後的信心圖
         smoothed = smooth_predictions(frame_preds)
         st.line_chart(smoothed)
 
         st.success("🎉 偵測完成！")
-        return output_video_path
     except Exception as e:
         st.error(f"❌ 影片處理錯誤: {e}")
         return None
