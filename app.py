@@ -153,10 +153,6 @@ option = st.radio("請選擇檔案類型：", ("圖片", "影片"))
 
 uploaded_file = st.file_uploader("📤 上傳檔案", type=["jpg", "jpeg", "png", "mp4", "mov"])
 
-# 增加關閉按鈕
-if st.button('關閉結果並重新上傳'):
-    st.experimental_rerun()  # 重新載入應用程式，回到上傳畫面
-
 if uploaded_file is not None:
     try:
         if option == "圖片" and uploaded_file.type.startswith("image"):
