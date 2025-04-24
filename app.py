@@ -111,6 +111,9 @@ def process_video_and_generate_result(video_file):
         with open(temp_video_path, "wb") as f:
             f.write(video_file.read())
         cap = cv2.VideoCapture(temp_video_path)
+        if not cap.isOpened():
+            st.error("❌ 無法打開影片檔案。")
+            return None
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -164,6 +167,8 @@ if uploaded_file is not None:
             processed_video_path = process_video_and_generate_result(uploaded_file)
             if processed_video_path:
                 st.video(processed_video_path)
+            else:
+                st.error("❌ 無法處理影片。")
         else:
             st.warning("請確認上傳的檔案類型與選擇一致。")
     except Exception as e:
