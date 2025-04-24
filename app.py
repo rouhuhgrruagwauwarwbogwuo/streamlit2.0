@@ -145,7 +145,10 @@ def process_video_and_generate_result(video_file):
                     label = "Deepfake" if combined_pred > 0.5 else "Real"
                     confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
-                    # 顯示圖片
+                    # 顯示圖片並在圖片上加上標籤
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    cv2.putText(display_img, f"{label} ({confidence:.2%})", (10, 30),
+                                font, 1, (0, 255, 0), 2, cv2.LINE_AA)
                     st.image(display_img, caption=f"幀 {frame_count}: {label} ({confidence:.2%})", use_container_width=True)
 
                     frame_preds.append(combined_pred)
