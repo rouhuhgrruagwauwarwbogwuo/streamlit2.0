@@ -90,52 +90,59 @@ def plot_confidence(resnet_conf, custom_conf, combined_conf):
 # 🔹 圖片處理邏輯
 
 def process_image(file_bytes):
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    resnet_input, custom_input, display_img = preprocess_for_models(img)
-    resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-    custom_pred = custom_model.predict(custom_input)[0][0]
-    combined_pred = (resnet_pred + custom_pred) / 2
-    label = "Deepfake" if combined_pred > 0.5 else "Real"
-    confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
-    st.image(img, caption=f"預測結果：{label} ({confidence:.2%})", use_container_width=True)
-    plot_confidence(resnet_pred, custom_pred, combined_pred)
+    try:
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        resnet_input, custom_input, display_img = preprocess_for_models(img)
+        resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+        custom_pred = custom_model.predict(custom_input)[0][0]
+        combined_pred = (resnet_pred + custom_pred) / 2
+        label = "Deepfake" if combined_pred > 0.5 else "Real"
+        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+        st.image(img, caption=f"預測結果：{label} ({confidence:.2%})", use_container_width=True)
+        plot_confidence(resnet_pred, custom_pred, combined_pred)
+    except Exception as e:
+        st.error(f"❌ 圖片處理錯誤: {e}")
 
 # 🔹 影片處理邏輯
 
 def process_video_and_generate_result(video_file):
-    temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
-    with open(temp_video_path, "wb") as f:
-        f.write(video_file.read())
-    cap = cv2.VideoCapture(temp_video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-    frame_preds = []
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        try:
-            resnet_input, custom_input, _ = preprocess_for_models(frame)
-            resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-            custom_pred = custom_model.predict(custom_input)[0][0]
-            combined_pred = (resnet_pred + custom_pred) / 2
-            frame_preds.append(combined_pred)
-            label = "Deepfake" if combined_pred > 0.5 else "Real"
-            confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
-            cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            out.write(frame)
-        except Exception as e:
-            st.error(f"處理幀錯誤: {e}")
-            break
-    cap.release()
-    out.release()
-    smoothed = smooth_predictions(frame_preds)
-    st.line_chart(smoothed)
-    return output_video_path
+    try:
+        temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
+        with open(temp_video_path, "wb") as f:
+            f.write(video_file.read())
+        cap = cv2.VideoCapture(temp_video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        output_video_path = os.path.join(tempfile.gettempdir(), "processed_video.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        frame_preds = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            try:
+                resnet_input, custom_input, _ = preprocess_for_models(frame)
+                resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+                custom_pred = custom_model.predict(custom_input)[0][0]
+                combined_pred = (resnet_pred + custom_pred) / 2
+                frame_preds.append(combined_pred)
+                label = "Deepfake" if combined_pred > 0.5 else "Real"
+                confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+                cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                out.write(frame)
+            except Exception as e:
+                st.error(f"處理幀錯誤: {e}")
+                break
+        cap.release()
+        out.release()
+        smoothed = smooth_predictions(frame_preds)
+        st.line_chart(smoothed)
+        return output_video_path
+    except Exception as e:
+        st.error(f"❌ 影片處理錯誤: {e}")
+        return None
 
 # 🔹 Streamlit UI
 st.title("🕵️ Deepfake 偵測 App")
@@ -143,12 +150,8 @@ option = st.radio("請選擇檔案類型：", ("圖片", "影片"))
 
 uploaded_file = st.file_uploader("📤 上傳檔案", type=["jpg", "jpeg", "png", "mp4", "mov"])
 
-# 創建區域來顯示上傳區域
-uploaded_file_placeholder = st.empty()
-
 # 增加關閉按鈕
 if st.button('關閉結果並重新上傳'):
-    uploaded_file_placeholder.empty()  # 清空當前畫面
     st.experimental_rerun()  # 重新載入應用程式，回到上傳畫面
 
 if uploaded_file is not None:
@@ -159,7 +162,8 @@ if uploaded_file is not None:
         elif option == "影片" and uploaded_file.type.startswith("video"):
             st.markdown("### 處理影片中...")
             processed_video_path = process_video_and_generate_result(uploaded_file)
-            st.video(processed_video_path)
+            if processed_video_path:
+                st.video(processed_video_path)
         else:
             st.warning("請確認上傳的檔案類型與選擇一致。")
     except Exception as e:
