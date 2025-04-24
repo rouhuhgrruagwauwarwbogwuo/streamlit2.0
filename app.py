@@ -5,9 +5,7 @@ import tempfile
 import requests
 import h5py
 import streamlit as st
-import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model, Sequential
-from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense
@@ -57,19 +55,37 @@ def preprocess_for_models(img):
     img_resized = cv2.resize(img, (256, 256))  # 重新調整大小為 256x256
 
     # For ResNet50
-    resnet_input = preprocess_input(np.expand_dims(img_resized, axis=0))
+    resnet_input = np.expand_dims(img_resized, axis=0)  # 增加 batch 維度
+    resnet_input = preprocess_input(resnet_input)  # 為 ResNet50 模型進行預處理
 
     # For Custom CNN (CLAHE gray enhancement)
     gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     clahe_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
-    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)
+    custom_input = np.expand_dims(clahe_rgb / 255.0, axis=0)  # 增加 batch 維度，正規化圖像數據
 
     return resnet_input, custom_input, img_resized
 
-# 🔹 偵測影片並生成新影片
-def process_video_and_generate_result(video_file):
+# 🔹 處理圖片的預測
+def process_image(file_bytes):
+    # 讀取圖片並進行預處理
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    resnet_input, custom_input, display_img = preprocess_for_models(img)
+
+    # 預測
+    resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+    custom_pred = custom_model.predict(custom_input)[0][0]
+
+    # 合併結果
+    combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
+    label = "Deepfake" if combined_pred > 0.5 else "Real"
+    confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+
+    return label, confidence, display_img
+
+# 🔹 處理影片的預測
+def process_video(video_file):
     # 將上傳的影片保存為臨時文件
     temp_video_path = os.path.join(tempfile.gettempdir(), "temp_video.mp4")
     with open(temp_video_path, "wb") as f:
@@ -89,37 +105,28 @@ def process_video_and_generate_result(video_file):
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
     frame_count = 0
-    processed_frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break  # 影片讀取結束
 
-        # 每 5 幀處理一次
-        if frame_count % 5 == 0:
-            try:
-                # 進行圖片預處理
-                resnet_input, custom_input, display_img = preprocess_for_models(frame)
+        # 進行圖片預處理
+        resnet_input, custom_input, display_img = preprocess_for_models(frame)
 
-                # 預測
-                resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-                custom_pred = custom_model.predict(custom_input)[0][0]
+        # 預測
+        resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
+        custom_pred = custom_model.predict(custom_input)[0][0]
 
-                # 合併結果
-                combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
-                label = "Deepfake" if combined_pred > 0.5 else "Real"
-                confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+        # 合併結果
+        combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
+        label = "Deepfake" if combined_pred > 0.5 else "Real"
+        confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
-                # 在影像上繪製標籤與信心分數
-                cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # 在影像上繪製標籤與信心分數
+        cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-                # 寫入每一幀
-                out.write(frame)
-                processed_frame_count += 1
-            except Exception as e:
-                st.error(f"❌ 處理影像幀時發生錯誤: {e}")
-                st.write(f"錯誤詳情: {str(e)}")
-                break
+        # 寫入每一幀
+        out.write(frame)
         frame_count += 1
 
     cap.release()
@@ -134,21 +141,12 @@ uploaded_file = st.file_uploader("📤 上傳一張圖片或影片", type=["jpg"
 if uploaded_file is not None:
     try:
         if uploaded_file.type in ["image/jpeg", "image/png", "image/jpg"]:
-            # 進行圖片預處理並顯示結果
+            # 處理圖片並顯示結果
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
             st.image(file_bytes, caption="你上傳的圖片", use_container_width=True)
 
-            # 進行預處理並獲得模型輸入
-            resnet_input, custom_input, display_img = preprocess_for_models(file_bytes)
-
-            # 預測
-            resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-            custom_pred = custom_model.predict(custom_input)[0][0]
-
-            # 合併結果
-            combined_pred = (resnet_pred + custom_pred) / 2  # 這裡簡單取平均
-            label = "Deepfake" if combined_pred > 0.5 else "Real"
-            confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+            # 進行預測
+            label, confidence, display_img = process_image(file_bytes)
 
             # 顯示結果
             st.markdown(f"### 🧑‍⚖️ 最終預測結果: **{label}** ({confidence:.2%})")
@@ -156,7 +154,7 @@ if uploaded_file is not None:
         elif uploaded_file.type in ["video/mp4", "video/quicktime"]:
             # 處理影片並生成結果
             st.markdown("### 📽️ 正在處理影片...")
-            processed_video_path = process_video_and_generate_result(uploaded_file)
+            processed_video_path = process_video(uploaded_file)
 
             # 顯示處理後的影片
             st.video(processed_video_path)
