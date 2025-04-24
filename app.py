@@ -12,6 +12,13 @@ from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense
 
+# 安裝 OpenCV 頭部版本的安全性處理
+try:
+    import cv2
+except ImportError:
+    st.error("❌ 未安裝 OpenCV，正在嘗試安裝 opencv-python-headless...")
+    os.system('pip install opencv-python-headless==4.5.5.64')
+
 # 🔹 Hugging Face 模型下載網址
 MODEL_URL = "https://huggingface.co/wuwuwu123123/deepfake/resolve/main/deepfake_cnn_model.h5"
 
