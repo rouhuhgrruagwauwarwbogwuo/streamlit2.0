@@ -83,21 +83,30 @@ def process_video_and_generate_result(video_file):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
+    frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
         try:
-            resnet_input, custom_input, _ = preprocess_for_models(frame)
-            resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-            custom_pred = custom_model.predict(custom_input)[0][0]
-            combined_pred = (resnet_pred + custom_pred) / 2
+            resnet_input, custom_input, display_img = preprocess_for_models(frame)
+
+            resnet_pred = resnet_classifier.predict(resnet_input)
+            custom_pred = custom_model.predict(custom_input)
+
+            if resnet_pred.size == 0 or custom_pred.size == 0:
+                continue
+
+            resnet_score = resnet_pred[0][0]
+            custom_score = custom_pred[0][0]
+            combined_pred = (resnet_score + custom_score) / 2
             label = "Deepfake" if combined_pred > 0.5 else "Real"
             confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
 
             cv2.putText(frame, f"{label} ({confidence:.2%})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             out.write(frame)
+            frame_count += 1
         except Exception as e:
             st.error(f"❌ 處理影像幀時發生錯誤: {e}")
             break
@@ -110,34 +119,53 @@ def process_video_and_generate_result(video_file):
 # 🔹 Streamlit App 主介面
 st.title("🕵️ Deepfake 偵測 App")
 
-file_type = st.radio("選擇要分析的檔案類型：", ["圖片", "影片"])
-uploaded_file = st.file_uploader("📤 請上傳檔案", type=["jpg", "jpeg", "png", "mp4", "mov"])
+mode = st.radio("選擇偵測模式：", ["圖片", "影片"])
+
+uploaded_file = st.file_uploader("📤 請上傳圖片或影片", type=["jpg", "jpeg", "png", "mp4", "mov"])
 
 if uploaded_file is not None:
     try:
-        if file_type == "圖片" and uploaded_file.type in ["image/jpeg", "image/png", "image/jpg"]:
+        if mode == "圖片" and uploaded_file.type in ["image/jpeg", "image/png", "image/jpg"]:
             st.markdown("### 🖼️ 圖片偵測結果")
+
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
             img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+            if img is None:
+                st.error("❌ 圖片讀取失敗，請重新上傳。")
+                st.stop()
+
             st.image(img, caption="你上傳的圖片", use_container_width=True)
 
             resnet_input, custom_input, _ = preprocess_for_models(img)
-            resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
-            custom_pred = custom_model.predict(custom_input)[0][0]
-            combined_pred = (resnet_pred + custom_pred) / 2
-            label = "Deepfake" if combined_pred > 0.5 else "Real"
-            confidence = combined_pred if combined_pred > 0.5 else 1 - combined_pred
+
+            resnet_pred = resnet_classifier.predict(resnet_input)
+            custom_pred = custom_model.predict(custom_input)
+
+            if resnet_pred.size == 0 or custom_pred.size == 0:
+                st.error("❌ 模型預測失敗，請檢查圖片格式或模型輸出。")
+                st.stop()
+
+            resnet_score = resnet_pred[0][0]
+            custom_score = custom_pred[0][0]
+            combined_score = (resnet_score + custom_score) / 2
+
+            label = "Deepfake" if combined_score > 0.5 else "Real"
+            confidence = combined_score if combined_score > 0.5 else 1 - combined_score
 
             st.markdown(f"### 🧑‍⚖️ 最終預測結果: **{label}** ({confidence:.2%})")
 
-        elif file_type == "影片" and uploaded_file.type in ["video/mp4", "video/quicktime"]:
+        elif mode == "影片" and uploaded_file.type in ["video/mp4", "video/quicktime"]:
             st.markdown("### 📽️ 影片偵測中...")
-            processed_video_path = process_video_and_generate_result(uploaded_file)
-            st.video(processed_video_path)
+            processed_path = process_video_and_generate_result(uploaded_file)
+            st.video(processed_path)
 
         else:
             st.warning("請上傳符合所選類型的檔案。")
 
+    except IndexError as ie:
+        st.error("❌ 預測時發生 IndexError，可能是模型未正確回傳結果。")
+        st.write(str(ie))
     except Exception as e:
-        st.error(f"❌ 發生錯誤: {e}")
-        st.write(f"錯誤詳情: {str(e)}")
+        st.error("❌ 發生未知錯誤。")
+        st.write(str(e))
