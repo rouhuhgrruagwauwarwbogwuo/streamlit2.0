@@ -63,30 +63,28 @@ def center_crop(img, target_size=(224, 224)):
 
 # 🔹 預處理：高通濾波和CLAHE增強
 def enhance_image(img_array):
-    # CLAHE 強化局部對比
+    # CLAHE增強
     lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
     cl = clahe.apply(l)
-    merged = cv2.merge((cl, a, b))
-    enhanced_img = cv2.cvtColor(merged, cv2.COLOR_LAB2RGB)
-    return enhanced_img
+    limg = cv2.merge((cl, a, b))
+    img_array = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB)
 
-def high_pass_filter(img_array):
-    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    high_pass = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
-    return cv2.cvtColor(high_pass, cv2.COLOR_GRAY2RGB)
+    # 高通濾波
+    kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+    img_array = cv2.filter2D(img_array, -1, kernel)
+    
+    return img_array
 
-# 🔹 預處理兩模型用圖片
+# 🔹 預處理圖片
 def preprocess_for_both_models(img):
     img = img.resize((256, 256), Image.Resampling.LANCZOS)
     img = center_crop(img, (224, 224))
     img_array = np.array(img)
 
-    # 增強處理圖片：CLAHE 和高通濾波
+    # 增強圖片
     img_array = enhance_image(img_array)
-    img_array = high_pass_filter(img_array)
 
     resnet_input = preprocess_input(np.expand_dims(img_array, axis=0))
     custom_input = np.expand_dims(img_array / 255.0, axis=0)
@@ -98,8 +96,11 @@ def predict_with_both_models(img):
     resnet_input, custom_input = preprocess_for_both_models(img)
     resnet_pred = resnet_classifier.predict(resnet_input)[0][0]
     resnet_label = "Deepfake" if resnet_pred > 0.5 else "Real"
+    
+    # 確保 custom_model 已載入且符合預測條件
     custom_pred = custom_model.predict(custom_input)[0][0] if custom_model else 0
     custom_label = "Deepfake" if custom_pred > 0.5 else "Real"
+    
     return resnet_label, resnet_pred, custom_label, custom_pred
 
 # 🔹 顯示預測
@@ -114,7 +115,7 @@ st.title("🧠 Deepfake 圖片與影片偵測器")
 
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ---------- 
+# ---------- 圖片 ----------
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
