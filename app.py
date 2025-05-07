@@ -109,19 +109,12 @@ def show_prediction(img):
     # 顯示未經處理的圖片
     st.image(img, caption="原始圖片", use_container_width=True)
     
+    # 顯示偵測到的人臉並縮小圖片
+    st.image(img, caption="偵測到的人臉", use_container_width=False, width=300)
+    
     # 顯示預測結果
     st.subheader(f"ResNet50: {resnet_label} ({resnet_confidence:.2%})\n"
                  f"Custom CNN: {custom_label} ({custom_confidence:.2%})")
-
-# 🔹 嘗試擷取人臉區域的函數
-def extract_face(img):
-    # 使用 MTCNN 偵測臉部
-    result = detector.detect_faces(np.array(img))
-    if result:
-        x, y, w, h = result[0]['box']
-        face = img.crop((x, y, x + w, y + h))
-        return face
-    return None
 
 # 🔹 Streamlit 主應用程式
 st.set_page_config(page_title="Deepfake 偵測器", layout="wide")
@@ -129,24 +122,24 @@ st.title("🧠 Deepfake 圖片與影片偵測器")
 
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ---------- 
+# ---------- 圖片 ----------
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
     if uploaded_image:
         pil_img = Image.open(uploaded_image).convert("RGB")
-        
+        st.image(pil_img, caption="原始圖片", use_container_width=True)
+
         # 嘗試擷取人臉區域
         face_img = extract_face(pil_img)
-        
         if face_img:
             st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
-            show_prediction(face_img)  # 顯示經處理後的預測結果
+            show_prediction(face_img)  
         else:
             st.write("未偵測到人臉，使用整體圖片進行預測")
-            show_prediction(pil_img)  # 顯示整體圖片的預測結果
+            show_prediction(pil_img)
 
-# ---------- 影片 ---------- 
+# ---------- 影片 ----------
 with tab2:
     st.header("影片偵測（只顯示第一張預測結果）")
     uploaded_video = st.file_uploader("上傳影片", type=["mp4", "mov", "avi"])
@@ -170,7 +163,7 @@ with tab2:
                 face_img = extract_face(frame_pil)
                 if face_img:
                     st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
-                    show_prediction(face_img)  # 顯示處理後的預測結果
+                    show_prediction(face_img)
                     break  
             frame_idx += 1
         cap.release()
