@@ -76,7 +76,7 @@ def preprocess_for_both_models(img):
     img_array = np.array(img)  # 轉為 numpy array
 
     # 3️⃣ **可選：對 ResNet50 做 Gaussian Blur**
-    apply = True  # 🚀 這裡可以開關
+    apply_blur = True  # 🚀 這裡可以開關
     if apply_blur:
         img_array = cv2.GaussianBlur(img_array, (3, 3), 0)
 
@@ -109,20 +109,21 @@ def show_prediction(img):
     # 顯示未經處理的圖片
     st.image(img, caption="原始圖片", use_container_width=True)
     
-    示偵測到的人臉並縮小圖片
-    st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
+    # 顯示偵測到的人臉並縮小圖片
+    st.image(img, caption="偵測到的人臉", use_container_width=False, width=300)
     
     # 顯示預測結果
     st.subheader(f"ResNet50: {resnet_label} ({resnet_confidence:.2%})\n"
                  f"Custom CNN: {custom_label} ({custom_confidence:.2%})")
 
-# 🔹 顯示人臉區域
+# 🔹 顯示並提取人臉
 def extract_face(img):
+    # 使用 MTCNN 偵測人臉
     faces = detector.detect_faces(np.array(img))
-    if faces:
+    if len(faces) > 0:
         x, y, w, h = faces[0]['box']
-        face = img.crop((x, y, x + w, y + h))  # 擷取第一張偵測到的臉部
-        return face
+        face_img = img.crop((x, y, x + w, y + h))
+        return face_img
     return None
 
 # 🔹 Streamlit 主應用程式
@@ -148,7 +149,7 @@ with tab1:
             st.write("未偵測到人臉，使用整體圖片進行預測")
             show_prediction(pil_img)
 
-# ---------- 影片 ---------- 
+# ---------- 影片 ----------
 with tab2:
     st.header("影片偵測（只顯示第一張預測結果）")
     uploaded_video = st.file_uploader("上傳影片", type=["mp4", "mov", "avi"])
@@ -171,7 +172,7 @@ with tab2:
                 frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 face_img = extract_face(frame_pil)
                 if face_img:
-                    st.image(face_img, caption="偵測到的人臉", use_container_width= width=300)
+                    st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
                     show_prediction(face_img)
                     break  
             frame_idx += 1
