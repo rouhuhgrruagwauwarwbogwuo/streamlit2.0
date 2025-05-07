@@ -34,10 +34,8 @@ def download_model():
 
 # 🔹 載入 ResNet50 模型
 resnet_model = ResNet50(weights='imagenet', include_top=False, pooling='avg', input_shape=(224, 224, 3))
-resnet_classifier = Sequential([
-    resnet_model,
-    Dense(1, activation='sigmoid')  
-])
+resnet_classifier = Sequential([resnet_model,
+    Dense(1, activation='sigmoid')])
 resnet_classifier.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
 # 🔹 載入自訂 CNN 模型
@@ -78,7 +76,7 @@ def preprocess_for_both_models(img):
     # 3️⃣ **可選：對 ResNet50 做 Gaussian Blur**
     apply_blur = True  # 🚀 這裡可以開關
     if apply_blur:
-        img_array = cv2.GaussianBlur(img_array, (5, 5), 0)
+        img_array = cv2.GaussianBlur(img_array, (3, 3), 0)
 
     # 4️⃣ **ResNet50 特定預處理**
     resnet_input = preprocess_input(np.expand_dims(img_array, axis=0))
@@ -122,7 +120,7 @@ st.title("🧠 Deepfake 圖片與影片偵測器")
 
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ---------- 
+# ---------- 圖片 ----------
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
