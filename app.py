@@ -65,6 +65,18 @@ def center_crop(img, target_size=(224, 224)):
     bottom = top + new_height
     return img.crop((left, top, right, bottom))
 
+# 🔹 擷取人臉區域
+def extract_face(img):
+    # 使用 MTCNN 偵測人臉
+    faces = detector.detect_faces(np.array(img))
+    if len(faces) > 0:
+        # 擷取第一個偵測到的人臉
+        x, y, w, h = faces[0]['box']
+        face_img = img.crop((x, y, x + w, y + h))
+        return face_img
+    else:
+        return None
+
 # 🔹 預處理圖片，確保 ResNet 和 自訂 CNN 都能處理
 def preprocess_for_both_models(img):
     # 1️⃣ **高清圖處理：LANCZOS 縮圖**
