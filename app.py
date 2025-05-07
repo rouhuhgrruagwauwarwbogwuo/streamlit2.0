@@ -2,7 +2,6 @@ import numpy as np
 import streamlit as st
 import cv2
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense
@@ -12,10 +11,6 @@ from mtcnn import MTCNN
 import tempfile
 import os
 import requests
-
-# 🔹 頁面設定需放最上面
-st.set_page_config(page_title="Deepfake 偵測器", layout="wide")
-st.title("🧠 Deepfake 圖片與影片偵測器")
 
 # 🔹 下載自訂 CNN 模型
 def download_model():
@@ -66,14 +61,32 @@ def center_crop(img, target_size=(224, 224)):
     top = (height - new_h) // 2
     return img.crop((left, top, left + new_w, top + new_h))
 
-# 🔹 預處理圖片
+# 🔹 預處理：高通濾波和CLAHE增強
+def enhance_image(img_array):
+    # CLAHE 強化局部對比
+    lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+    merged = cv2.merge((cl, a, b))
+    enhanced_img = cv2.cvtColor(merged, cv2.COLOR_LAB2RGB)
+    return enhanced_img
+
+def high_pass_filter(img_array):
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    high_pass = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
+    return cv2.cvtColor(high_pass, cv2.COLOR_GRAY2RGB)
+
+# 🔹 預處理兩模型用圖片
 def preprocess_for_both_models(img):
     img = img.resize((256, 256), Image.Resampling.LANCZOS)
     img = center_crop(img, (224, 224))
     img_array = np.array(img)
 
-    # 加上 Gaussian Blur（雖然讓圖片變藍，但偵測更準）
-    img_array = cv2.GaussianBlur(img_array, (3, 3), 0)
+    # 增強處理圖片：CLAHE 和高通濾波
+    img_array = enhance_image(img_array)
+    img_array = high_pass_filter(img_array)
 
     resnet_input = preprocess_input(np.expand_dims(img_array, axis=0))
     custom_input = np.expand_dims(img_array / 255.0, axis=0)
@@ -95,10 +108,13 @@ def show_prediction(img):
     st.subheader(f"ResNet50：{resnet_label}（{resnet_conf:.2%}）")
     st.subheader(f"Custom CNN：{custom_label}（{custom_conf:.2%}）")
 
-# 🔹 介面區塊
+# 🔹 Streamlit 介面
+st.set_page_config(page_title="Deepfake 偵測器", layout="wide")
+st.title("🧠 Deepfake 圖片與影片偵測器")
+
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ----------
+# ---------- 圖片 ---------- 
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
@@ -124,12 +140,11 @@ with tab2:
             tmp.write(uploaded_video.read())
             video_path = tmp.name
 
-        st.info("影片處理中，僅顯示第一個成功分析的幀")
+        st.info("處理影片中...")
         cap = cv2.VideoCapture(video_path)
         frame_idx = 0
-        found = False
 
-        while cap.isOpened() and not found:
+        while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
@@ -140,9 +155,6 @@ with tab2:
                 if face_img:
                     st.image(face_img, caption=f"第 {frame_idx} 幀偵測到人臉", width=300)
                     show_prediction(face_img)
-                    found = True
+                    break
             frame_idx += 1
         cap.release()
-
-        if not found:
-            st.warning("影片中未偵測到可用人臉")
