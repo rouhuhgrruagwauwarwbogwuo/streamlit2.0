@@ -12,7 +12,13 @@ from mtcnn import MTCNN
 import tempfile
 import os
 import requests
-import h5py
+import random
+import tensorflow as tf
+
+# 設置隨機種子，保證每次結果一致
+np.random.seed(42)
+random.seed(42)
+tf.random.set_seed(42)
 
 # 檢查並下載模型檔案
 def download_model():
@@ -116,23 +122,13 @@ def show_prediction(img):
     st.subheader(f"ResNet50: {resnet_label} ({resnet_confidence:.2%})\n"
                  f"Custom CNN: {custom_label} ({custom_confidence:.2%})")
 
-# 🔹 顯示並提取人臉
-def extract_face(img):
-    # 使用 MTCNN 偵測人臉
-    faces = detector.detect_faces(np.array(img))
-    if len(faces) > 0:
-        x, y, w, h = faces[0]['box']
-        face_img = img.crop((x, y, x + w, y + h))
-        return face_img
-    return None
-
 # 🔹 Streamlit 主應用程式
 st.set_page_config(page_title="Deepfake 偵測器", layout="wide")
 st.title("🧠 Deepfake 圖片與影片偵測器")
 
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ---------- 
+# ---------- 圖片 ----------  
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
@@ -149,7 +145,7 @@ with tab1:
             st.write("未偵測到人臉，使用整體圖片進行預測")
             show_prediction(pil_img)
 
-# ---------- 影片 ----------
+# ---------- 影片 ----------  
 with tab2:
     st.header("影片偵測（只顯示第一張預測結果）")
     uploaded_video = st.file_uploader("上傳影片", type=["mp4", "mov", "avi"])
