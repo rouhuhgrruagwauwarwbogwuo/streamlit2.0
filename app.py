@@ -102,6 +102,18 @@ def predict_with_both_models(img):
     
     return resnet_label, resnet_prediction, custom_label, custom_prediction
 
+# 🔹 擷取人臉區域
+def extract_face(img):
+    # 偵測人臉
+    faces = detector.detect_faces(np.array(img))
+    
+    if len(faces) > 0:
+        # 假設偵測到最多的一個人臉
+        x, y, w, h = faces[0]['box']
+        face_img = img.crop((x, y, x + w, y + h))
+        return face_img
+    return None
+
 # 🔹 顯示圖片和預測結果
 def show_prediction(img):
     resnet_label, resnet_confidence, custom_label, custom_confidence = predict_with_both_models(img)
