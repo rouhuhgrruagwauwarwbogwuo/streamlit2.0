@@ -116,41 +116,6 @@ def show_prediction(img):
     st.subheader(f"ResNet50: {resnet_label} ({resnet_confidence:.2%})\n"
                  f"Custom CNN: {custom_label} ({custom_confidence:.2%})")
 
-# 🔹 擷取人臉函數
-def extract_face(img):
-    # 使用 MTCNN 偵測人臉
-    faces = detector.detect_faces(np.array(img))
-    
-    if len(faces) > 0:
-        # 假設我們只取第一個偵測到的人臉
-        x, y, w, h = faces[0]['box']
-        face_img = img.crop((x, y, x + w, y + h))  # 擷取人臉區域
-        return face_img
-    return None
-
-# 🔹 Streamlit 主應用程式
-st.set_page_config(page_title="Deepfake 偵測器", layout="wide")
-st.title("🧠 Deepfake 圖片與影片偵測器")
-
-tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
-
-# ---------- 圖片 ---------- 
-with tab1:
-    st.header("圖片偵測")
-    uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
-    if uploaded_image:
-        pil_img = Image.open(uploaded_image).convert("RGB")
-        st.image(pil_img, caption="原始圖片", use_container_width=True)
-
-        # 嘗試擷取人臉區域
-        face_img = extract_face(pil_img)
-        if face_img:
-            st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
-            show_prediction(face_img)  
-        else:
-            st.write("未偵測到人臉，使用整體圖片進行預測")
-            show_prediction(pil_img)
-
 # ---------- 影片 ---------- 
 with tab2:
     st.header("影片偵測（只顯示第一張預測結果）")
@@ -171,7 +136,9 @@ with tab2:
             if not ret:
                 break
             if frame_idx % 10 == 0:
-                frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                # 使用 BGR 轉換為 RGB 保證正確的顏色順序
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_pil = Image.fromarray(frame_rgb)
                 face_img = extract_face(frame_pil)
                 if face_img:
                     st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
