@@ -110,7 +110,7 @@ def show_prediction(img):
     st.image(img, caption="原始圖片", use_container_width=True)
     
     示偵測到的人臉並縮小圖片
-    st.image(img, caption="偵測到的人臉", use_container_width=False, width=300)
+    st.image(face_img, caption="偵測到的人臉", use_container_width=False, width=300)
     
     # 顯示預測結果
     st.subheader(f"ResNet50: {resnet_label} ({resnet_confidence:.2%})\n"
