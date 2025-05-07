@@ -34,8 +34,10 @@ def download_model():
 
 # 🔹 載入 ResNet50 模型
 resnet_model = ResNet50(weights='imagenet', include_top=False, pooling='avg', input_shape=(224, 224, 3))
-resnet_classifier = Sequential([resnet_model,
-    Dense(1, activation='sigmoid')])
+resnet_classifier = Sequential([
+    resnet_model,
+    Dense(1, activation='sigmoid')  
+])
 resnet_classifier.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
 # 🔹 載入自訂 CNN 模型
@@ -100,6 +102,18 @@ def predict_with_both_models(img):
     
     return resnet_label, resnet_prediction, custom_label, custom_prediction
 
+# 🔹 擷取人臉區域
+def extract_face(img):
+    # 偵測人臉
+    faces = detector.detect_faces(np.array(img))
+    
+    if len(faces) > 0:
+        # 假設偵測到最多的一個人臉
+        x, y, w, h = faces[0]['box']
+        face_img = img.crop((x, y, x + w, y + h))
+        return face_img
+    return None
+
 # 🔹 顯示圖片和預測結果
 def show_prediction(img):
     resnet_label, resnet_confidence, custom_label, custom_confidence = predict_with_both_models(img)
@@ -120,7 +134,7 @@ st.title("🧠 Deepfake 圖片與影片偵測器")
 
 tab1, tab2 = st.tabs(["🖼️ 圖片偵測", "🎥 影片偵測"])
 
-# ---------- 圖片 ----------
+# ---------- 圖片 ---------- 
 with tab1:
     st.header("圖片偵測")
     uploaded_image = st.file_uploader("上傳圖片", type=["jpg", "jpeg", "png"])
