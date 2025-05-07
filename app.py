@@ -86,8 +86,9 @@ def preprocess_for_both_models(img):
     # 增強圖片
     img_array = enhance_image(img_array)
 
-    resnet_input = preprocess_input(np.expand_dims(img_array, axis=0))
-    custom_input = np.expand_dims(img_array / 255.0, axis=0)
+    # 確保輸入格式符合模型要求
+    resnet_input = preprocess_input(np.expand_dims(img_array, axis=0).astype(np.float32))
+    custom_input = np.expand_dims(img_array / 255.0, axis=0).astype(np.float32)
 
     return resnet_input, custom_input
 
