@@ -1,9 +1,7 @@
-
-streamlit
 opencv-python-headless
 tensorflow
-keras
-mtcnn
 Pillow
 numpy
-huggingface_hub
+matplotlib
+streamlit
+mtcnn
